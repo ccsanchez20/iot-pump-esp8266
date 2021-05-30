@@ -17,8 +17,8 @@ void reconnect_mqtt() {
     if (mqttClient.connect(clientId.c_str(),mqtt_user,mqtt_pass)) {
       debug("Conectado!");
       // Nos suscribimos
-      mqttClient.subscribe("+/#");
-      //mqttClient.subscribe(topic2.c_str());
+      mqttClient.subscribe(getValuesTopic);
+      mqttClient.subscribe(setValueTopic);
     } else {
       debug("falló :( con error -> "+String(mqttClient.state()));
       debug(" Intentamos de nuevo en 5 segundos");

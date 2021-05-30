@@ -34,11 +34,19 @@ PubSubClient mqttClient(espClient);
 long lastMsg = 0;
 char msg[MAX_PAYLOAD_SIZE];
 char topic[MAX_TOPIC_SIZE];
+String pubValuesMsg = "";
+bool setValues = true;
 
 
 /* Gloabl topics */
-String getValueTopicStr = device_name_str + "/getValues";
+String getValuesTopicStr = device_name_str + "/getValues";
+String setValuesTopicStr = device_name_str + "/setValues";
+const char *getValuesTopic = getValuesTopicStr.c_str();
+String setValuesTopic = setValuesTopicStr.c_str();
+String getValueTopicStr = device_name_str + "/getValue/#";
 String getValueTopic = getValueTopicStr.c_str();
+String setValueTopicStr = device_name_str + "/setValue/#";
+const char *setValueTopic = setValueTopicStr.c_str();
 
 /*
   boolean haveToSend = true;
@@ -48,15 +56,28 @@ String getValueTopic = getValueTopicStr.c_str();
 
 void sendValues()
 {
-  for (int i = 0; i < MAX_IO_QUANTITY; i++)
-  {
-    if (mqttBuffer[i].haveToSend)
+  if (setValues) {
+    for (int i = 0; i < MAX_IO_QUANTITY; i++)
     {
-      mqttBuffer[i].msg.toCharArray(msg, MAX_PAYLOAD_SIZE);
-      mqttBuffer[i].topic.toCharArray(topic, MAX_TOPIC_SIZE);
-      debug("Datos a publicar -> " + String(msg));
-      mqttClient.publish(topic, msg, true);
-      mqttBuffer[i].haveToSend = false;
+      pubValuesMsg+=(mqttBuffer[i].msg+"/");
+    }
+    pubValuesMsg.toCharArray(msg, MAX_PAYLOAD_SIZE);
+    setValuesTopic.toCharArray(topic, MAX_TOPIC_SIZE);
+    debug("Datos a publicar -> " + String(msg));
+    mqttClient.publish(topic, msg, true);
+    setValues = false;
+    pubValuesMsg = "";
+  } else {
+    for (int i = 0; i < MAX_IO_QUANTITY; i++)
+    {
+      if (mqttBuffer[i].haveToSend)
+      {
+        mqttBuffer[i].msg.toCharArray(msg, MAX_PAYLOAD_SIZE);
+        mqttBuffer[i].topic.toCharArray(topic, MAX_TOPIC_SIZE);
+        debug("Datos a publicar -> " + String(msg));
+        mqttClient.publish(topic, msg, true);
+        mqttBuffer[i].haveToSend = false;
+      }
     }
   }
 }
@@ -68,11 +89,8 @@ void receiveValues()
   {
     if (mqttBuffer[i].haveToReceive)
     {
-      mqttBuffer[i].msg.toCharArray(msg, MAX_PAYLOAD_SIZE);
-      mqttBuffer[i].topic.toCharArray(topic, MAX_TOPIC_SIZE);
-      debug("Datos a publicar -> " + String(msg));
-      mqttClient.publish(topic, msg, true);
-      mqttBuffer[i].haveToSend = false;
+      stringToValue(i);
+      mqttBuffer[i].haveToReceive = false;
     }
   }
 }
@@ -89,19 +107,28 @@ void topicMatch(String topic, String msg)
   //String prefix = device_name_str + "/";
   //topic.replace(prefix,"");
   Serial.println("Topic recibido: " + topic);
-  if (topic == getValueTopic)
+  if (topic == getValuesTopicStr)
   {
-    dataToSend();
+    debug("Recibida solicitud de actualización de estado");
+    setValues = true;
   }
-  else
-  {
-    for (int i = 0; i < MAX_IO_QUANTITY; i++)
+  else {
+    String prefix = device_name_str + "/setValue/";
+    int pos=topic.indexOf(prefix);
+    if (pos>=0)
     {
-      if (topic == mqttBuffer[i].topic)
+      debug("Recibido valor de parámetro");
+      topic.replace(prefix,"");
+      for (int i = 0; i < MAX_IO_QUANTITY; i++)
       {
-        mqttBuffer[i].haveToReceive = true;
-        mqttBuffer[i].msg = msg;
+        if (topic.toInt() == mqttBuffer[i].mqttAddr)
+        {
+          mqttBuffer[i].haveToReceive = true;
+          mqttBuffer[i].msg = msg;
+        }
       }
+    } else {
+      debug("Recibido valor extraño");      
     }
   }
 }
@@ -122,6 +149,6 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
   debug("Mensaje -> " + incoming);
   topicMatch(String(topic), incoming);
-  incoming.trim();
-  debug("Mensaje después de trim -> " + incoming);
+  //incoming.trim();
+  //debug("Mensaje después de trim -> " + incoming);
 }

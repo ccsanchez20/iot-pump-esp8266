@@ -22,8 +22,8 @@ void loop() {
   reconnect_wifi();
   reconnect_mqtt();
 
-  checkMqttMsg();
   main_loop();
+  checkMqttMsg();
 
   mqttClient.loop();
 
